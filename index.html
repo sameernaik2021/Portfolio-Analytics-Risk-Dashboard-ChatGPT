@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Portfolio Analytics & Risk Dashboard — offline quantitative portfolio analysis and decision support.">
+  <title>Portfolio Analytics & Risk Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div>
+    <div class="eyebrow">QUANTITATIVE PORTFOLIO LAB</div>
+    <h1>Portfolio Analytics & Risk Dashboard</h1>
+    <p class="subtitle">Performance • Risk • Diversification • Allocation • Stress Testing • Rebalancing</p>
+  </div>
+  <div class="actions">
+    <button id="loadDemo" class="btn primary">Load Demo</button>
+    <label class="btn secondary file-btn">Import Holdings CSV<input id="csvFile" type="file" accept=".csv,text/csv"></label>
+    <button id="exportReport" class="btn secondary">Export Report</button>
+  </div>
+</header>
+
+<main class="shell">
+  <section class="notice">
+    <strong>Decision-support only.</strong> This app analyzes the data you provide; it does not predict returns or tell you what security to buy. Demo data is synthetic. For real use, verify prices, corporate actions, taxes, liquidity, and suitability independently.
+  </section>
+
+  <section class="grid kpis" id="kpis"></section>
+
+  <section class="grid two">
+    <article class="card">
+      <div class="card-head"><div><h2>Portfolio value & growth</h2><p>Time-weighted illustrative portfolio index versus benchmark.</p></div><span class="pill" id="periodPill"></span></div>
+      <div class="chart-wrap"><canvas id="performanceChart" aria-label="Portfolio and benchmark performance chart"></canvas></div>
+    </article>
+    <article class="card">
+      <div class="card-head"><div><h2>Asset allocation</h2><p>Actual weights versus target policy.</p></div></div>
+      <div class="donut-layout">
+        <div class="chart-wrap donut"><canvas id="allocationChart" aria-label="Asset allocation donut chart"></canvas></div>
+        <div id="allocationLegend" class="legend"></div>
+      </div>
+    </article>
+  </section>
+
+  <section class="grid three">
+    <article class="card"><div class="card-head"><h2>Risk profile</h2><span class="info">Annualized</span></div><div id="riskMetrics" class="metric-list"></div></article>
+    <article class="card"><div class="card-head"><h2>Concentration</h2><span class="info">Exposure structure</span></div><div id="concentration"></div></article>
+    <article class="card"><div class="card-head"><h2>Decision signals</h2><span class="info">Rule-based</span></div><div id="signals"></div></article>
+  </section>
+
+  <section class="grid two">
+    <article class="card">
+      <div class="card-head"><div><h2>Risk contribution</h2><p>Marginal contribution to portfolio volatility under the supplied covariance assumptions.</p></div></div>
+      <div class="chart-wrap tall"><canvas id="riskContributionChart" aria-label="Risk contribution bar chart"></canvas></div>
+    </article>
+    <article class="card">
+      <div class="card-head"><div><h2>Drawdown profile</h2><p>Peak-to-trough decline from the synthetic or imported portfolio series.</p></div></div>
+      <div class="chart-wrap tall"><canvas id="drawdownChart" aria-label="Portfolio drawdown chart"></canvas></div>
+    </article>
+  </section>
+
+  <section class="grid two">
+    <article class="card">
+      <div class="card-head"><div><h2>Correlation matrix</h2><p>Model correlation assumptions used in portfolio risk estimation.</p></div></div>
+      <div id="corrHeatmap" class="heatmap"></div>
+    </article>
+    <article class="card">
+      <div class="card-head"><div><h2>Stress testing</h2><p>Scenario estimates based on asset-class shocks. These are not forecasts.</p></div></div>
+      <div id="stressTable"></div>
+    </article>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><div><h2>XIRR cash-flow calculator</h2><p>Money-weighted annualized return for dated deposits, withdrawals and a terminal value.</p></div><button id="calcXirr" class="btn primary">Calculate XIRR</button></div>
+    <textarea id="xirrInput" rows="5" aria-label="XIRR cash flows">2025-01-01,-200000
+2025-04-01,-100000
+2025-08-01,-200000
+2025-12-31,575000</textarea>
+    <div id="xirrResult" class="signal" style="margin-top:10px"></div>
+    <p class="empty">Format: <code>YYYY-MM-DD,amount</code>. Investments are normally negative cash flows; withdrawals/terminal value are positive. At least one positive and one negative flow are required.</p>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <div><h2>Rebalancing & investor strategy framework</h2><p>Uses your target weights, drift bands and risk settings to identify actions for review.</p></div>
+      <div class="controls">
+        <label>Risk tolerance
+          <select id="riskTolerance"><option value="conservative">Conservative</option><option value="moderate" selected>Moderate</option><option value="aggressive">Aggressive</option></select>
+        </label>
+        <label>Drift band
+          <input id="driftBand" type="number" min="0.5" max="20" step="0.5" value="5">%
+        </label>
+      </div>
+    </div>
+    <div id="strategy" class="strategy"></div>
+    <div class="table-wrap"><table id="rebalanceTable"><thead><tr><th>Asset</th><th>Current</th><th>Target</th><th>Drift</th><th>Review action</th><th>Indicative ₹ change</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><div><h2>Holdings</h2><p>Edit cells, then press Recalculate. Expected CSV columns are documented below.</p></div><button id="recalc" class="btn primary">Recalculate</button></div>
+    <div class="table-wrap"><table id="holdingsTable"><thead><tr><th>Symbol</th><th>Name</th><th>Asset type</th><th>Sector</th><th>Qty</th><th>Avg cost</th><th>Current price</th><th>Beta</th><th>Volatility</th><th>Target %</th><th>Value</th><th>P&amp;L</th></tr></thead><tbody></tbody></table></div>
+    <details class="csv-help"><summary>CSV format</summary><code>symbol,name,assetType,sector,quantity,avgCost,currentPrice,beta,volatility,targetPct</code><p>Volatility and targetPct are percentages (e.g. 18 means 18%). Beta is dimensionless. Values are calculated from quantity × price.</p></details>
+  </section>
+
+  <section class="card methodology">
+    <div class="card-head"><div><h2>Quantitative methodology</h2><p>Transparent formulas rather than opaque scoring.</p></div></div>
+    <div class="formula-grid">
+      <div><b>Volatility</b><span>σ<sub>p</sub> = √(wᵀΣw) × √252</span></div>
+      <div><b>Sharpe</b><span>(R<sub>p</sub> − R<sub>f</sub>) / σ<sub>p</sub></span></div>
+      <div><b>Sortino</b><span>(R<sub>p</sub> − R<sub>f</sub>) / downside deviation</span></div>
+      <div><b>Beta</b><span>Cov(R<sub>p</sub>, R<sub>b</sub>) / Var(R<sub>b</sub>)</span></div>
+      <div><b>VaR 95%</b><span>Historical 5th percentile of periodic returns</span></div>
+      <div><b>CVaR 95%</b><span>Mean loss beyond the VaR threshold</span></div>
+      <div><b>Max drawdown</b><span>min[(V<sub>t</sub> / max(V≤t)) − 1]</span></div>
+      <div><b>Concentration</b><span>HHI = Σwᵢ²; effective holdings = 1 / HHI</span></div>
+    </div>
+  </section>
+</main>
+<footer>Portfolio Analytics & Risk Dashboard • Local/offline calculation • No live market-data connection</footer>
+<script src="app.js"></script>
+</body>
+</html>
